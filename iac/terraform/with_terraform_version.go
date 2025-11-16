@@ -1,17 +1,16 @@
 package main
 
-// WithTerraformVersion sets the Terraform CLI version (default: "1.9")
+// WithTerraformVersion configure la version de Terraform
 func (m *Terraform) WithTerraformVersion(
 	// +optional
-	// +default="1.9"
+	// +default="1.9.8"
 	version string,
 ) *Terraform {
-	if version == "" {
-		version = "1.9"
-	}
+	newVariables := make([]Variable, len(m.Variables))
+	copy(newVariables, m.Variables)
 
 	return &Terraform{
-		Variables:        m.Variables,
+		Variables:        newVariables,
 		State:            m.State,
 		TerraformVersion: version,
 	}
