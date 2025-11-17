@@ -2,62 +2,64 @@ package main
 
 import (
 	"context"
+
 	"dagger/terraform/internal/dagger"
 )
 
-// Deploy deploys infrastructure using Terraform
+// Apply applique les changements Terraform à l'infrastructure
 //
-// This function runs `terraform init` followed by `terraform apply`.
-// Variables must be configured beforehand using WithVariable().
+// Cette fonction exécute `terraform init` suivi de `terraform apply`.
+// Les variables doivent être configurées au préalable via WithVariable().
 //
-// Example usage:
+// Exemple:
 //
 //	dagger call \
-//	  with-variable --key proxmox_api_url --value env://PM_API_URL --secret --tf-var \
-//	  with-variable --key target_node --value pve-node-01 --tf-var \
-//	  deploy --source=../infra-postgres --auto-approve
-func (m *Terraform) Deploy(
+//	  with-variable --key vsphere_user --value env:VSPHERE_USER --secret --tf-var \
+//	  with-variable --key vsphere_password --value env:VSPHERE_PASSWORD --secret --tf-var \
+//	  with-state --backend s3 --bucket my-state --key terraform.tfstate --region us-east-1 \
+//	  apply --source ./terraform --auto-approve
+func (m *Terraform) Apply(
 	ctx context.Context,
-	// Infrastructure repository directory
+	// Répertoire contenant le code Terraform
 	source *dagger.Directory,
-	// Working directory relative to source (default: terraform)
-	// +optional
-	// +default="terraform"
-	workdir string,
-	// Auto-approve without confirmation
+	// Appliquer automatiquement sans confirmation
 	// +optional
 	// +default=false
 	autoApprove bool,
+	// Options supplémentaires pour terraform apply
+	// +optional
+	applyArgs []string,
 ) (string, error) {
-	if workdir == "" {
-		workdir = "terraform"
-	}
-
-	// Configure backend if state is configured
-	source, err := m.configureBackend(ctx, source, workdir)
+	// Configurer le backend si un état est configuré
+	source, err := m.configureBackend(ctx, source)
 	if err != nil {
 		return "", err
 	}
 
-	// Build base container
-	container := m.buildContainer(source, workdir)
+	// Construire le conteneur de base
+	container := m.buildContainer(source)
 
-	// Inject variables
+	// Injecter les variables
 	container, err = m.injectVariables(ctx, container)
 	if err != nil {
 		return "", err
 	}
 
-	// Run terraform init
+	// Exécuter terraform init
 	container = container.WithExec([]string{"terraform", "init"})
 
-	// Run terraform apply
+	// Construire la commande apply
 	args := []string{"terraform", "apply"}
 	if autoApprove {
 		args = append(args, "-auto-approve")
 	}
+	if len(applyArgs) > 0 {
+		args = append(args, applyArgs...)
+	}
+
+	// Exécuter terraform apply
 	container = container.WithExec(args)
 
-	// Return output
+	// Retourner le résultat
 	return container.Stdout(ctx)
 }

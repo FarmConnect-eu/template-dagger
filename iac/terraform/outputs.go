@@ -2,68 +2,68 @@ package main
 
 import (
 	"context"
+
 	"dagger/terraform/internal/dagger"
 )
 
-// Outputs retrieves Terraform outputs from infrastructure deployment
+// Output récupère les outputs Terraform
 //
-// Returns all outputs as JSON, or a specific module/output if specified.
-// Variables must be configured beforehand using WithVariable().
+// Cette fonction exécute `terraform init` suivi de `terraform output`.
+// Les outputs sont retournés au format JSON par défaut.
 //
-// Example: Get all outputs as JSON
-//
-//	dagger call \
-//	  with-variable --key proxmox_api_url --value env://PM_API_URL --secret --tf-var \
-//	  outputs --source=../infra-nfs
-//
-// Example: Get specific output
+// Exemple (tous les outputs):
 //
 //	dagger call \
-//	  with-variable --key proxmox_api_url --value env://PM_API_URL --secret --tf-var \
-//	  outputs --source=../infra-postgres --output-name postgres_ip
-func (m *Terraform) Outputs(
+//	  with-state --backend s3 --bucket my-state --key terraform.tfstate --region us-east-1 \
+//	  output --source ./terraform
+//
+// Exemple (output spécifique):
+//
+//	dagger call \
+//	  with-state --backend s3 --bucket my-state --key terraform.tfstate --region us-east-1 \
+//	  output --source ./terraform --output-name instance_ip
+func (m *Terraform) Output(
 	ctx context.Context,
-	// Infrastructure repository directory
+	// Répertoire contenant le code Terraform
 	source *dagger.Directory,
-	// Working directory relative to source (default: terraform)
-	// +optional
-	// +default="terraform"
-	workdir string,
-	// Specific output name (returns all as JSON if empty)
+	// Nom d'un output spécifique (laisser vide pour tous)
 	// +optional
 	outputName string,
+	// Format JSON
+	// +optional
+	// +default=true
+	asJson bool,
 ) (string, error) {
-	if workdir == "" {
-		workdir = "terraform"
-	}
-
-	// Configure backend if state is configured
-	source, err := m.configureBackend(ctx, source, workdir)
+	// Configurer le backend si un état est configuré
+	source, err := m.configureBackend(ctx, source)
 	if err != nil {
 		return "", err
 	}
 
-	// Build base container
-	container := m.buildContainer(source, workdir)
+	// Construire le conteneur de base
+	container := m.buildContainer(source)
 
-	// Inject variables
+	// Injecter les variables (pour l'accès au backend)
 	container, err = m.injectVariables(ctx, container)
 	if err != nil {
 		return "", err
 	}
 
-	// Run terraform init
+	// Exécuter terraform init
 	container = container.WithExec([]string{"terraform", "init"})
 
-	// Run terraform output
+	// Construire la commande output
 	args := []string{"terraform", "output"}
-	if outputName != "" {
-		args = append(args, outputName)
-	} else {
+	if asJson {
 		args = append(args, "-json")
 	}
+	if outputName != "" {
+		args = append(args, outputName)
+	}
+
+	// Exécuter terraform output
 	container = container.WithExec(args)
 
-	// Return output
+	// Retourner le résultat
 	return container.Stdout(ctx)
 }

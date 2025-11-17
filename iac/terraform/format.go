@@ -2,45 +2,46 @@ package main
 
 import (
 	"context"
+
 	"dagger/terraform/internal/dagger"
 )
 
-// Format formats the Terraform configuration files
+// Format formate les fichiers Terraform
 //
-// Runs terraform fmt to ensure consistent formatting.
-// No variables needed for formatting.
+// Cette fonction exécute `terraform fmt` pour formater le code.
 //
-// Example usage:
+// Exemple:
 //
-//	dagger call format --source=../infra-postgres
-//	dagger call format --source=../infra-nfs --check
+//	dagger call \
+//	  format --source ./terraform
 func (m *Terraform) Format(
 	ctx context.Context,
-	// Infrastructure repository directory
+	// Répertoire contenant le code Terraform
 	source *dagger.Directory,
-	// Working directory relative to source (default: terraform)
-	// +optional
-	// +default="terraform"
-	workdir string,
-	// Check if files are formatted (returns error if not)
+	// Vérifier seulement si les fichiers sont formatés (sans modifier)
 	// +optional
 	// +default=false
 	check bool,
-) (*dagger.Directory, error) {
-	if workdir == "" {
-		workdir = "terraform"
-	}
+	// Formatter récursivement les sous-répertoires
+	// +optional
+	// +default=true
+	recursive bool,
+) (string, error) {
+	// Construire le conteneur de base
+	container := m.buildContainer(source)
 
-	// Build base container (no variables needed for formatting)
-	container := m.buildContainer(source, workdir)
-
-	// Run terraform fmt
+	// Construire la commande fmt
 	args := []string{"terraform", "fmt"}
 	if check {
 		args = append(args, "-check")
 	}
+	if recursive {
+		args = append(args, "-recursive")
+	}
+
+	// Exécuter terraform fmt
 	container = container.WithExec(args)
 
-	// Return formatted directory
-	return container.Directory("/work"), nil
+	// Retourner le résultat
+	return container.Stdout(ctx)
 }

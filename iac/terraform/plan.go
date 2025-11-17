@@ -2,54 +2,65 @@ package main
 
 import (
 	"context"
+
 	"dagger/terraform/internal/dagger"
 )
 
-// Plan shows what changes will be made to infrastructure
+// Plan génère et affiche un plan d'exécution Terraform
 //
-// This function runs `terraform init` followed by `terraform plan`.
-// Variables must be configured beforehand using WithVariable().
+// Cette fonction exécute `terraform init` suivi de `terraform plan`.
+// Les variables doivent être configurées au préalable via WithVariable().
 //
-// Example usage:
+// Exemple:
 //
 //	dagger call \
-//	  with-variable --key proxmox_api_url --value env://PM_API_URL --secret --tf-var \
-//	  with-variable --key target_node --value pve-node-01 --tf-var \
-//	  plan --source=../infra-postgres
+//	  with-variable --key vsphere_user --value env:VSPHERE_USER --secret --tf-var \
+//	  with-variable --key vsphere_password --value env:VSPHERE_PASSWORD --secret --tf-var \
+//	  with-variable --key vsphere_server --value vcenter.local --tf-var \
+//	  with-state --backend s3 --bucket my-state --key terraform.tfstate --region us-east-1 \
+//	  plan --source ./terraform
 func (m *Terraform) Plan(
 	ctx context.Context,
-	// Infrastructure repository directory
+	// Répertoire contenant le code Terraform
 	source *dagger.Directory,
-	// Working directory relative to source (default: terraform)
+	// Utiliser -detailed-exitcode (0=no changes, 1=error, 2=changes)
 	// +optional
-	// +default="terraform"
-	workdir string,
+	// +default=false
+	detailedExitcode bool,
+	// Options supplémentaires pour terraform plan
+	// +optional
+	planArgs []string,
 ) (string, error) {
-	if workdir == "" {
-		workdir = "terraform"
-	}
-
-	// Configure backend if state is configured
-	source, err := m.configureBackend(ctx, source, workdir)
+	// Configurer le backend si un état est configuré
+	source, err := m.configureBackend(ctx, source)
 	if err != nil {
 		return "", err
 	}
 
-	// Build base container
-	container := m.buildContainer(source, workdir)
+	// Construire le conteneur de base
+	container := m.buildContainer(source)
 
-	// Inject variables
+	// Injecter les variables
 	container, err = m.injectVariables(ctx, container)
 	if err != nil {
 		return "", err
 	}
 
-	// Run terraform init
+	// Exécuter terraform init
 	container = container.WithExec([]string{"terraform", "init"})
 
-	// Run terraform plan
-	container = container.WithExec([]string{"terraform", "plan"})
+	// Construire la commande plan
+	args := []string{"terraform", "plan"}
+	if detailedExitcode {
+		args = append(args, "-detailed-exitcode")
+	}
+	if len(planArgs) > 0 {
+		args = append(args, planArgs...)
+	}
 
-	// Return output
+	// Exécuter terraform plan
+	container = container.WithExec(args)
+
+	// Retourner le résultat
 	return container.Stdout(ctx)
 }

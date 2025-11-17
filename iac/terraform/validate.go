@@ -2,39 +2,38 @@ package main
 
 import (
 	"context"
+
 	"dagger/terraform/internal/dagger"
 )
 
-// Validate validates the Terraform configuration
+// Validate valide la configuration Terraform
 //
-// Checks for syntax errors and configuration issues without connecting to Proxmox.
-// No variables needed for validation.
+// Cette fonction exécute `terraform init` suivi de `terraform validate`.
 //
-// Example usage:
+// Exemple:
 //
-//	dagger call validate --source=../infra-traefik
+//	dagger call \
+//	  validate --source ./terraform
 func (m *Terraform) Validate(
 	ctx context.Context,
-	// Infrastructure repository directory
+	// Répertoire contenant le code Terraform
 	source *dagger.Directory,
-	// Working directory relative to source (default: terraform)
-	// +optional
-	// +default="terraform"
-	workdir string,
 ) (string, error) {
-	if workdir == "" {
-		workdir = "terraform"
+	// Configurer le backend si un état est configuré
+	source, err := m.configureBackend(ctx, source)
+	if err != nil {
+		return "", err
 	}
 
-	// Build base container (no variables needed for validation)
-	container := m.buildContainer(source, workdir)
+	// Construire le conteneur de base
+	container := m.buildContainer(source)
 
-	// Run terraform init
+	// Exécuter terraform init
 	container = container.WithExec([]string{"terraform", "init", "-backend=false"})
 
-	// Run terraform validate
+	// Exécuter terraform validate
 	container = container.WithExec([]string{"terraform", "validate"})
 
-	// Return output
+	// Retourner le résultat
 	return container.Stdout(ctx)
 }

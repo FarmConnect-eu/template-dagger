@@ -2,65 +2,64 @@ package main
 
 import (
 	"context"
+
 	"dagger/terraform/internal/dagger"
 )
 
-// Destroy destroys infrastructure managed by Terraform
+// Destroy détruit l'infrastructure gérée par Terraform
 //
-// WARNING: This will destroy all resources managed by the Terraform configuration.
-// Make sure to backup any important data before running this command.
+// Cette fonction exécute `terraform init` suivi de `terraform destroy`.
+// Les variables doivent être configurées au préalable via WithVariable().
 //
-// This function runs `terraform init` followed by `terraform destroy`.
-// Variables must be configured beforehand using WithVariable().
-//
-// Example usage:
+// Exemple:
 //
 //	dagger call \
-//	  with-variable --key proxmox_api_url --value env://PM_API_URL --secret --tf-var \
-//	  with-variable --key target_node --value pve-node-01 --tf-var \
-//	  destroy --source=../infra-postgres --auto-approve
+//	  with-variable --key vsphere_user --value env:VSPHERE_USER --secret --tf-var \
+//	  with-variable --key vsphere_password --value env:VSPHERE_PASSWORD --secret --tf-var \
+//	  with-state --backend s3 --bucket my-state --key terraform.tfstate --region us-east-1 \
+//	  destroy --source ./terraform --auto-approve
 func (m *Terraform) Destroy(
 	ctx context.Context,
-	// Infrastructure repository directory
+	// Répertoire contenant le code Terraform
 	source *dagger.Directory,
-	// Working directory relative to source (default: terraform)
-	// +optional
-	// +default="terraform"
-	workdir string,
-	// Auto-approve without confirmation
+	// Détruire automatiquement sans confirmation
 	// +optional
 	// +default=false
 	autoApprove bool,
+	// Options supplémentaires pour terraform destroy
+	// +optional
+	destroyArgs []string,
 ) (string, error) {
-	if workdir == "" {
-		workdir = "terraform"
-	}
-
-	// Configure backend if state is configured
-	source, err := m.configureBackend(ctx, source, workdir)
+	// Configurer le backend si un état est configuré
+	source, err := m.configureBackend(ctx, source)
 	if err != nil {
 		return "", err
 	}
 
-	// Build base container
-	container := m.buildContainer(source, workdir)
+	// Construire le conteneur de base
+	container := m.buildContainer(source)
 
-	// Inject variables
+	// Injecter les variables
 	container, err = m.injectVariables(ctx, container)
 	if err != nil {
 		return "", err
 	}
 
-	// Run terraform init
+	// Exécuter terraform init
 	container = container.WithExec([]string{"terraform", "init"})
 
-	// Run terraform destroy
+	// Construire la commande destroy
 	args := []string{"terraform", "destroy"}
 	if autoApprove {
 		args = append(args, "-auto-approve")
 	}
+	if len(destroyArgs) > 0 {
+		args = append(args, destroyArgs...)
+	}
+
+	// Exécuter terraform destroy
 	container = container.WithExec(args)
 
-	// Return output
+	// Retourner le résultat
 	return container.Stdout(ctx)
 }

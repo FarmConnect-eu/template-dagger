@@ -2,40 +2,30 @@ package main
 
 import (
 	"context"
-	"dagger/terraform/internal/dagger"
 	"fmt"
-	"strings"
+
+	"dagger/terraform/internal/dagger"
 )
 
-// resolveVariableValue resolves env:// or literal values
-// Note: env:// prefix is stripped but not resolved - caller must pass resolved values
-func (m *Terraform) resolveVariableValue(ctx context.Context, value string, isSecret bool) (any, error) {
-	// Strip env:// prefix if present (caller must resolve environment variables)
-	value = strings.TrimPrefix(value, "env://")
-
-	if isSecret {
-		return dag.SetSecret("literal", value), nil
-	}
-	return value, nil
-}
-
-// buildContainer creates Terraform container with source mounted
+// buildContainer crée un conteneur Terraform avec le code source monté
 func (m *Terraform) buildContainer(
 	source *dagger.Directory,
-	workdir string,
 ) *dagger.Container {
 	terraformVersion := m.TerraformVersion
 	if terraformVersion == "" {
-		terraformVersion = "1.9"
+		terraformVersion = "1.9.8"
 	}
 
 	return dag.Container().
 		From(fmt.Sprintf("hashicorp/terraform:%s", terraformVersion)).
 		WithDirectory("/work", source).
-		WithWorkdir(fmt.Sprintf("/work/%s", workdir))
+		WithWorkdir("/work")
 }
 
-// injectVariables injects variables as environment variables
+// injectVariables injecte les variables accumulées dans le conteneur
+// Les variables marquées comme secrets sont injectées via WithSecretVariable
+// Les autres via WithEnvVariable
+// Le préfixe env:// est géré nativement par Dagger (pas besoin de le stripper)
 func (m *Terraform) injectVariables(
 	ctx context.Context,
 	container *dagger.Container,
@@ -46,34 +36,26 @@ func (m *Terraform) injectVariables(
 			varName = "TF_VAR_" + v.Key
 		}
 
-		resolvedValue, err := m.resolveVariableValue(ctx, v.Value, v.IsSecret)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve variable %s: %w", v.Key, err)
-		}
-
 		if v.IsSecret {
-			secret, ok := resolvedValue.(*dagger.Secret)
-			if !ok {
-				return nil, fmt.Errorf("expected secret for variable %s, got %T", v.Key, resolvedValue)
-			}
+			// Pour les secrets, on utilise SetSecret avec la valeur
+			// Dagger gère automatiquement env://, file://, etc.
+			secret := dag.SetSecret(v.Key, v.Value)
 			container = container.WithSecretVariable(varName, secret)
 		} else {
-			value, ok := resolvedValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("expected string for variable %s, got %T", v.Key, resolvedValue)
-			}
-			container = container.WithEnvVariable(varName, value)
+			// Pour les variables non-secrètes, on injecte directement
+			// Note: Si la valeur contient env://, Dagger le résoudra automatiquement
+			container = container.WithEnvVariable(varName, v.Value)
 		}
 	}
 
 	return container, nil
 }
 
-// configureBackend generates backend.tf if state is configured
+// configureBackend génère dynamiquement le fichier backend.tf si un état est configuré
+// Supporte : s3, gcs, azurerm, local
 func (m *Terraform) configureBackend(
 	ctx context.Context,
 	source *dagger.Directory,
-	workdir string,
 ) (*dagger.Directory, error) {
 	if m.State == nil {
 		return source, nil
@@ -119,13 +101,11 @@ func (m *Terraform) configureBackend(
 `, m.State.Key)
 
 	default:
-		return nil, fmt.Errorf("unsupported backend type: %s", m.State.Backend)
+		return nil, fmt.Errorf("unsupported backend type: %s (supported: s3, gcs, azurerm, local)", m.State.Backend)
 	}
 
-	backendFile := dag.Directory().WithNewFile("backend.tf", backendConfig)
-	source = source.WithDirectory(workdir, backendFile, dagger.DirectoryWithDirectoryOpts{
-		Merge: true,
-	})
+	// Créer le fichier backend.tf à la racine du source
+	source = source.WithNewFile("backend.tf", backendConfig)
 
 	return source, nil
 }
