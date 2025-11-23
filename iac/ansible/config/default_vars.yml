@@ -1,0 +1,27 @@
+# Variables par défaut pour les playbooks Ansible
+# Ces valeurs peuvent être surchargées via WithExtraVars()
+
+# Installation des langages de programmation
+install_golang: true
+install_rust: false
+install_nodejs: true
+install_python: false
+install_powershell: true
+
+# Installation des outils système et CLI
+install_system_tools: true
+install_cli_tools: true
+install_editors: true
+install_terminal_tools: true
+install_monitoring_tools: true
+
+# Création des structures de projet DSIN
+create_dsin_projet: true
+create_dsin_infrastructure: true
+
+# Configuration des outils
+configure_tmux: true
+configure_vim: true
+configure_neovim: false
+configure_zsh: true
+configure_shell_prompt: true

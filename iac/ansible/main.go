@@ -1,17 +1,61 @@
-// Ansible CI/CD module for Dagger.
-// Automates Ansible workflows with secret management.
-
+// Package main provides a Dagger module for executing Ansible in containers.
 package main
 
-// Variable to inject into Ansible (supports literal, env://, file://)
+import (
+	"context"
+	_ "embed"
+
+	"dagger/ansible/internal/dagger"
+)
+
+var (
+	//go:embed config/requirements.txt
+	requirementsTxt string
+
+	//go:embed config/default_vars.yml
+	defaultVarsYml string
+
+	//go:embed config/ansible.cfg
+	ansibleCfg string
+)
+
 type Variable struct {
-	Key      string
-	Value    string
-	IsSecret bool
+	Key         string
+	Value       string
+	SecretValue *dagger.Secret
 }
 
-// Ansible module
+type KeyValue struct {
+	Key   string
+	Value string
+}
+
 type Ansible struct {
 	Variables      []Variable
 	AnsibleVersion string
+	Inventory      *dagger.File
+	Requirements   *dagger.File
+	ExtraVars      []KeyValue
+	Tags           []string
+	SkipTags       []string
+}
+
+func New() *Ansible {
+	return &Ansible{
+		Variables:      []Variable{},
+		AnsibleVersion: "2.17",
+		Inventory:      nil,
+		Requirements:   nil,
+		ExtraVars:      []KeyValue{},
+		Tags:           []string{},
+		SkipTags:       []string{},
+	}
+}
+
+// Test verifies the module loads correctly.
+func (m *Ansible) Test(ctx context.Context) (string, error) {
+	return dag.Container().
+		From("alpine:latest").
+		WithExec([]string{"echo", "Ansible module loaded successfully"}).
+		Stdout(ctx)
 }

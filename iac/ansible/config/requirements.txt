@@ -1,0 +1,10 @@
+# Minimal dependencies for Ansible Azure collections
+# Azure CLI is already installed system-wide via official script
+# The azure.azcollection collections use these packages for Azure integration
+
+# Base utilities
+packaging
+requests
+xmltodict
+
+

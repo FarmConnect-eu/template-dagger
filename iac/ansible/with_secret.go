@@ -1,10 +1,19 @@
 package main
 
-// WithAnsibleVersion sets the Ansible version (default: 2.17).
-func (m *Ansible) WithAnsibleVersion(
-	version string,
+import "dagger/ansible/internal/dagger"
+
+// WithSecret adds a secret variable (supports env:, file: prefixes).
+func (m *Ansible) WithSecret(
+	key string,
+	value *dagger.Secret,
 ) *Ansible {
-	newVariables := make([]Variable, len(m.Variables))
+	newVar := Variable{
+		Key:         key,
+		Value:       "",
+		SecretValue: value,
+	}
+
+	newVariables := make([]Variable, len(m.Variables), len(m.Variables)+1)
 	copy(newVariables, m.Variables)
 
 	newExtraVars := make([]KeyValue, len(m.ExtraVars))
@@ -16,8 +25,8 @@ func (m *Ansible) WithAnsibleVersion(
 	copy(newSkipTags, m.SkipTags)
 
 	return &Ansible{
-		Variables:      newVariables,
-		AnsibleVersion: version,
+		Variables:      append(newVariables, newVar),
+		AnsibleVersion: m.AnsibleVersion,
 		Inventory:      m.Inventory,
 		Requirements:   m.Requirements,
 		ExtraVars:      newExtraVars,

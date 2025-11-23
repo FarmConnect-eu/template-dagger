@@ -2,90 +2,99 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"strings"
+
 	"dagger/ansible/internal/dagger"
 )
 
-// AnsiblePlaybook executes an Ansible playbook
-// source = template-ansible (roles), playbookSource = infra-* (playbooks/inventory)
-func (m *Ansible) AnsiblePlaybook(
+// RunPlaybook executes an Ansible playbook with the configured inventory, variables, and secrets.
+func (m *Ansible) RunPlaybook(
 	ctx context.Context,
+	// Playbook file (e.g., site.yml)
+	playbook *dagger.File,
+	// Source directory (contains roles/, group_vars/, etc.)
 	source *dagger.Directory,
-	// +optional
-	playbookSource *dagger.Directory,
-	workdir string,
-	playbook string,
-	inventory string,
+	// SSH private key for host connections (supports file:, env:)
 	sshPrivateKey *dagger.Secret,
-	extraVars string,
-	tags string,
-	limit string,
-	verbose int,
+	// Check mode (dry-run, no changes)
+	// +optional
+	// +default=false
 	checkMode bool,
+	// Verbosity level (0-4)
+	// +optional
+	// +default=0
+	verbose int,
+	// Limit pattern to restrict execution to specific hosts
+	// +optional
+	limit string,
 ) (string, error) {
-	// Build ansible-playbook command
-	args := []string{
-		"ansible-playbook",
-		"-i", inventory,
-		playbook,
+	if playbook == nil {
+		return "", fmt.Errorf("playbook file is required")
 	}
 
-	// Add verbose flags
-	if verbose > 0 {
-		verboseFlag := "-"
-		for i := 0; i < verbose && i < 4; i++ {
-			verboseFlag += "v"
-		}
+	if m.Inventory == nil {
+		return "", fmt.Errorf("inventory is required: use WithInventory to set inventory file")
+	}
+
+	if sshPrivateKey == nil {
+		return "", fmt.Errorf("ssh-private-key is required")
+	}
+
+	container := m.buildContainer(source)
+
+	container, err := m.injectVariables(ctx, container)
+	if err != nil {
+		return "", fmt.Errorf("failed to inject variables: %w", err)
+	}
+
+	container = container.
+		WithExec([]string{"mkdir", "-p", "/root/.ssh"}).
+		WithMountedSecret("/root/.ssh/id_rsa", sshPrivateKey).
+		WithExec([]string{"chmod", "600", "/root/.ssh/id_rsa"})
+
+	container = container.
+		WithExec([]string{"sh", "-c", "ssh-keyscan -H github.com >> /root/.ssh/known_hosts || true"})
+
+	container = container.WithMountedFile("/work/inventory", m.Inventory)
+	container = container.WithMountedFile("/work/playbook.yml", playbook)
+
+	args := []string{"/opt/ansible-venv/bin/ansible-playbook"}
+	args = append(args, "-i", "/work/inventory")
+	args = append(args, "/work/playbook.yml")
+
+	if verbose > 0 && verbose <= 4 {
+		verboseFlag := "-" + strings.Repeat("v", verbose)
 		args = append(args, verboseFlag)
 	}
 
-	// Add check mode
 	if checkMode {
 		args = append(args, "--check")
 	}
 
-	// Add tags
-	if tags != "" {
-		args = append(args, "--tags", tags)
+	if len(m.Tags) > 0 {
+		args = append(args, "--tags", strings.Join(m.Tags, ","))
 	}
 
-	// Add limit
+	if len(m.SkipTags) > 0 {
+		args = append(args, "--skip-tags", strings.Join(m.SkipTags, ","))
+	}
+
 	if limit != "" {
 		args = append(args, "--limit", limit)
 	}
 
-	// Add extra vars
-	if extraVars != "" {
-		args = append(args, "--extra-vars", extraVars)
+	if len(m.ExtraVars) > 0 {
+		extraVarsJSON := m.buildExtraVars()
+		args = append(args, "--extra-vars", extraVarsJSON)
 	}
 
-	// Determine sources: if playbookSource is nil, use source for everything (backward compat)
-	rolesSource := source
-	workSource := source
-	if playbookSource != nil {
-		workSource = playbookSource
-	}
-
-	// Create container with Ansible
-	container := m.buildContainer(rolesSource, "").
-		WithDirectory("/ansible", rolesSource).
-		WithDirectory("/work", workSource).
-		WithWorkdir("/work/" + workdir).
-		WithEnvVariable("ANSIBLE_ROLES_PATH", "/ansible/roles").
-		WithExec([]string{"mkdir", "-p", "/root/.ssh"}).
-		WithMountedSecret("/root/.ssh/id_rsa", sshPrivateKey).
-		WithExec([]string{"chmod", "600", "/root/.ssh/id_rsa"}).
-		WithExec([]string{"ssh-keyscan", "-H", "github.com"}, dagger.ContainerWithExecOpts{
-			RedirectStdout: "/root/.ssh/known_hosts",
-		})
-
-	// Inject variables from WithVariable
-	container, err := m.injectVariables(ctx, container)
-	if err != nil {
-		return "", err
-	}
-
-	// Run ansible-playbook
 	container = container.WithExec(args)
 
-	return container.Stdout(ctx)
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute playbook: %w", err)
+	}
+
+	return output, nil
 }

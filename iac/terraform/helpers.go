@@ -7,25 +7,27 @@ import (
 	"dagger/terraform/internal/dagger"
 )
 
-// buildContainer crée un conteneur Terraform avec le code source monté
 func (m *Terraform) buildContainer(
 	source *dagger.Directory,
+	// +optional
+	// +default="."
+	subpath string,
 ) *dagger.Container {
 	terraformVersion := m.TerraformVersion
 	if terraformVersion == "" {
 		terraformVersion = "1.9.8"
 	}
 
+	if subpath == "" {
+		subpath = "."
+	}
+
 	return dag.Container().
 		From(fmt.Sprintf("hashicorp/terraform:%s", terraformVersion)).
 		WithDirectory("/work", source).
-		WithWorkdir("/work")
+		WithWorkdir(fmt.Sprintf("/work/%s", subpath))
 }
 
-// injectVariables injecte les variables accumulées dans le conteneur
-// Les variables marquées comme secrets sont injectées via WithSecretVariable
-// Les autres via WithEnvVariable
-// Le préfixe env:// est géré nativement par Dagger (pas besoin de le stripper)
 func (m *Terraform) injectVariables(
 	ctx context.Context,
 	container *dagger.Container,
@@ -36,14 +38,9 @@ func (m *Terraform) injectVariables(
 			varName = "TF_VAR_" + v.Key
 		}
 
-		if v.IsSecret {
-			// Pour les secrets, on utilise SetSecret avec la valeur
-			// Dagger gère automatiquement env://, file://, etc.
-			secret := dag.SetSecret(v.Key, v.Value)
-			container = container.WithSecretVariable(varName, secret)
+		if v.SecretValue != nil {
+			container = container.WithSecretVariable(varName, v.SecretValue)
 		} else {
-			// Pour les variables non-secrètes, on injecte directement
-			// Note: Si la valeur contient env://, Dagger le résoudra automatiquement
 			container = container.WithEnvVariable(varName, v.Value)
 		}
 	}
@@ -51,14 +48,19 @@ func (m *Terraform) injectVariables(
 	return container, nil
 }
 
-// configureBackend génère dynamiquement le fichier backend.tf si un état est configuré
-// Supporte : s3, gcs, azurerm, local
 func (m *Terraform) configureBackend(
 	ctx context.Context,
 	source *dagger.Directory,
+	// +optional
+	// +default="."
+	subpath string,
 ) (*dagger.Directory, error) {
 	if m.State == nil {
 		return source, nil
+	}
+
+	if subpath == "" {
+		subpath = "."
 	}
 
 	var backendConfig string
@@ -67,9 +69,14 @@ func (m *Terraform) configureBackend(
 	case "s3":
 		backendConfig = fmt.Sprintf(`terraform {
   backend "s3" {
-    bucket = "%s"
-    key    = "%s"
-    region = "%s"
+    bucket                      = "%s"
+    key                         = "%s"
+    region                      = "%s"
+    skip_requesting_account_id  = true
+    skip_credentials_validation = true
+    skip_metadata_api_check     = true
+    skip_region_validation      = true
+    use_path_style              = true
   }
 }
 `, m.State.Bucket, m.State.Key, m.State.Region)
@@ -104,8 +111,11 @@ func (m *Terraform) configureBackend(
 		return nil, fmt.Errorf("unsupported backend type: %s (supported: s3, gcs, azurerm, local)", m.State.Backend)
 	}
 
-	// Créer le fichier backend.tf à la racine du source
-	source = source.WithNewFile("backend.tf", backendConfig)
+	backendPath := fmt.Sprintf("%s/backend.tf", subpath)
+	if subpath == "." {
+		backendPath = "backend.tf"
+	}
+	source = source.WithNewFile(backendPath, backendConfig)
 
 	return source, nil
 }

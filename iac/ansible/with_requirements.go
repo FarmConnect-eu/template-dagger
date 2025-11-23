@@ -1,8 +1,10 @@
 package main
 
-// WithAnsibleVersion sets the Ansible version (default: 2.17).
-func (m *Ansible) WithAnsibleVersion(
-	version string,
+import "dagger/ansible/internal/dagger"
+
+// WithRequirements sets the Ansible requirements file (requirements.yml for collections/roles).
+func (m *Ansible) WithRequirements(
+	requirements *dagger.File,
 ) *Ansible {
 	newVariables := make([]Variable, len(m.Variables))
 	copy(newVariables, m.Variables)
@@ -17,9 +19,9 @@ func (m *Ansible) WithAnsibleVersion(
 
 	return &Ansible{
 		Variables:      newVariables,
-		AnsibleVersion: version,
+		AnsibleVersion: m.AnsibleVersion,
 		Inventory:      m.Inventory,
-		Requirements:   m.Requirements,
+		Requirements:   requirements,
 		ExtraVars:      newExtraVars,
 		Tags:           newTags,
 		SkipTags:       newSkipTags,

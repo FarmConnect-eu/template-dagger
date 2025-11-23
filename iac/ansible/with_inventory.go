@@ -1,8 +1,10 @@
 package main
 
-// WithAnsibleVersion sets the Ansible version (default: 2.17).
-func (m *Ansible) WithAnsibleVersion(
-	version string,
+import "dagger/ansible/internal/dagger"
+
+// WithInventory sets the inventory file.
+func (m *Ansible) WithInventory(
+	inventory *dagger.File,
 ) *Ansible {
 	newVariables := make([]Variable, len(m.Variables))
 	copy(newVariables, m.Variables)
@@ -17,8 +19,8 @@ func (m *Ansible) WithAnsibleVersion(
 
 	return &Ansible{
 		Variables:      newVariables,
-		AnsibleVersion: version,
-		Inventory:      m.Inventory,
+		AnsibleVersion: m.AnsibleVersion,
+		Inventory:      inventory,
 		Requirements:   m.Requirements,
 		ExtraVars:      newExtraVars,
 		Tags:           newTags,

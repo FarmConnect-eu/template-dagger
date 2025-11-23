@@ -1,17 +1,19 @@
 package main
 
-// WithVariable adds une variable (non-secrète) au module
-func (m *Terraform) WithVariable(
+import "dagger/terraform/internal/dagger"
+
+// WithSecret adds un secret au module
+func (m *Terraform) WithSecret(
 	key string,
-	value string,
+	value *dagger.Secret,
 	// +optional
 	// +default=false
 	tfVar bool,
 ) *Terraform {
 	newVar := Variable{
 		Key:         key,
-		Value:       value,
-		SecretValue: nil,
+		Value:       "",
+		SecretValue: value,
 		TfVar:       tfVar,
 	}
 
