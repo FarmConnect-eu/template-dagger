@@ -35,6 +35,7 @@ type Ansible struct {
 	AnsibleVersion string
 	Inventory      *dagger.File
 	Requirements   *dagger.File
+	RolesPath      *dagger.Directory
 	ExtraVars      []KeyValue
 	Tags           []string
 	SkipTags       []string
@@ -43,9 +44,10 @@ type Ansible struct {
 func New() *Ansible {
 	return &Ansible{
 		Variables:      []Variable{},
-		AnsibleVersion: "2.17",
+		AnsibleVersion: "11.1.0",
 		Inventory:      nil,
 		Requirements:   nil,
+		RolesPath:      nil,
 		ExtraVars:      []KeyValue{},
 		Tags:           []string{},
 		SkipTags:       []string{},

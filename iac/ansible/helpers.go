@@ -61,7 +61,7 @@ func (m *Ansible) buildContainer(
 	}
 
 	container = container.
-		WithEnvVariable("PATH", "/opt/ansible-venv/bin:$PATH").
+		WithEnvVariable("PATH", "/opt/ansible-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 		WithEnvVariable("ANSIBLE_HOST_KEY_CHECKING", "False").
 		WithEnvVariable("ANSIBLE_FORCE_COLOR", "true").
 		WithEnvVariable("ANSIBLE_STDOUT_CALLBACK", "yaml").
@@ -71,8 +71,14 @@ func (m *Ansible) buildContainer(
 		WithDirectory("/work", source).
 		WithWorkdir("/work")
 
+	if m.RolesPath != nil {
+		container = container.
+			WithDirectory("/work/roles", m.RolesPath).
+			WithEnvVariable("ANSIBLE_ROLES_PATH", "/work/roles")
+	}
+
 	container = container.
-		WithExec([]string{"apt-get", "clean"}).
+		WithExec([]string{"/usr/bin/apt-get", "clean"}).
 		WithExec([]string{"rm", "-rf", "/var/lib/apt/lists/*", "/tmp/*"})
 
 	return container
