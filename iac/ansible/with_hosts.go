@@ -6,7 +6,8 @@ import (
 )
 
 // WithHosts creates a dynamic inventory from a comma-separated list of hosts.
-// Useful when you have a list of IPs from Terraform outputs.
+// This is useful when you have a list of IPs from Terraform outputs.
+// Example: with-hosts --hosts "192.168.1.10,192.168.1.11" --user "admincd24"
 func (m *Ansible) WithHosts(
 	// Comma-separated list of hosts (e.g., "192.168.1.10,192.168.1.11")
 	hosts string,
@@ -33,6 +34,7 @@ func (m *Ansible) WithHosts(
 		}
 	}
 
+	// Add group variables if user is specified
 	if user != "" {
 		inventoryContent.WriteString(fmt.Sprintf("\n[%s:vars]\n", group))
 		inventoryContent.WriteString(fmt.Sprintf("ansible_user=%s\n", user))
@@ -59,7 +61,6 @@ func (m *Ansible) WithHosts(
 		AnsibleVersion: m.AnsibleVersion,
 		Inventory:      inventoryFile,
 		Requirements:   m.Requirements,
-		RolesPath:      m.RolesPath,
 		ExtraVars:      newExtraVars,
 		Tags:           newTags,
 		SkipTags:       newSkipTags,

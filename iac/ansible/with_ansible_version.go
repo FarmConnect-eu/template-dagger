@@ -1,6 +1,7 @@
 package main
 
-// WithAnsibleVersion sets the Ansible version (default: 2.17).
+// WithAnsibleVersion sets the Ansible version (default: 11.1.0).
+// Note: Ansible versioning changed at 3.0. Use 10.x/11.x for ansible-core 2.17+.
 func (m *Ansible) WithAnsibleVersion(
 	version string,
 ) *Ansible {

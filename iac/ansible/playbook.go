@@ -21,10 +21,6 @@ func (m *Ansible) RunPlaybook(
 	// +optional
 	// +default=false
 	checkMode bool,
-	// Verbosity level (0-4)
-	// +optional
-	// +default=0
-	verbose int,
 	// Limit pattern to restrict execution to specific hosts
 	// +optional
 	limit string,
@@ -50,8 +46,10 @@ func (m *Ansible) RunPlaybook(
 
 	container = container.
 		WithExec([]string{"mkdir", "-p", "/root/.ssh"}).
-		WithMountedSecret("/root/.ssh/id_rsa", sshPrivateKey).
-		WithExec([]string{"chmod", "600", "/root/.ssh/id_rsa"})
+		WithMountedSecret("/root/.ssh/id_rsa", sshPrivateKey, dagger.ContainerWithMountedSecretOpts{
+			Mode:  0600,
+			Owner: "root:root",
+		})
 
 	container = container.
 		WithExec([]string{"sh", "-c", "ssh-keyscan -H github.com >> /root/.ssh/known_hosts || true"})
@@ -63,10 +61,7 @@ func (m *Ansible) RunPlaybook(
 	args = append(args, "-i", "/work/inventory")
 	args = append(args, "/work/playbook.yml")
 
-	if verbose > 0 && verbose <= 4 {
-		verboseFlag := "-" + strings.Repeat("v", verbose)
-		args = append(args, verboseFlag)
-	}
+	args = append(args, "-v")
 
 	if checkMode {
 		args = append(args, "--check")
