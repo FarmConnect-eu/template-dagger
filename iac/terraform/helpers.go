@@ -13,9 +13,9 @@ func (m *Terraform) buildContainer(
 	// +default="."
 	subpath string,
 ) *dagger.Container {
-	terraformVersion := m.TerraformVersion
-	if terraformVersion == "" {
-		terraformVersion = "1.9.8"
+	tofuVersion := m.TerraformVersion
+	if tofuVersion == "" {
+		tofuVersion = "1.10.6"
 	}
 
 	if subpath == "" {
@@ -23,7 +23,7 @@ func (m *Terraform) buildContainer(
 	}
 
 	return dag.Container().
-		From(fmt.Sprintf("hashicorp/terraform:%s", terraformVersion)).
+		From(fmt.Sprintf("ghcr.io/opentofu/opentofu:%s", tofuVersion)).
 		WithDirectory("/work", source).
 		WithWorkdir(fmt.Sprintf("/work/%s", subpath))
 }
@@ -67,6 +67,13 @@ func (m *Terraform) configureBackend(
 
 	switch m.State.Backend {
 	case "s3":
+		endpointBlock := ""
+		if m.State.Endpoint != "" {
+			endpointBlock = fmt.Sprintf(`
+    endpoints {
+      s3 = "%s"
+    }`, m.State.Endpoint)
+		}
 		backendConfig = fmt.Sprintf(`terraform {
   backend "s3" {
     bucket                      = "%s"
@@ -76,10 +83,10 @@ func (m *Terraform) configureBackend(
     skip_credentials_validation = true
     skip_metadata_api_check     = true
     skip_region_validation      = true
-    use_path_style              = true
+    use_path_style              = true%s
   }
 }
-`, m.State.Bucket, m.State.Key, m.State.Region)
+`, m.State.Bucket, m.State.Key, m.State.Region, endpointBlock)
 
 	case "gcs":
 		backendConfig = fmt.Sprintf(`terraform {

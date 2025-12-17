@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"dagger/terraform/internal/dagger"
 )
@@ -19,44 +20,33 @@ func (m *Terraform) Destroy(
 	// +optional
 	// +default="."
 	subpath string,
-	// Détruire automatiquement sans confirmation
-	// +optional
-	// +default=false
-	autoApprove bool,
 	// Options supplémentaires pour terraform destroy
 	// +optional
 	destroyArgs []string,
 ) (string, error) {
-	
+
 	source, err := m.configureBackend(ctx, source, subpath)
 	if err != nil {
 		return "", err
 	}
 
-	
 	container := m.buildContainer(source, subpath)
 
-	
 	container, err = m.injectVariables(ctx, container)
 	if err != nil {
 		return "", err
 	}
 
-	
-	container = container.WithExec([]string{"terraform", "init"})
+	container = container.
+		WithEnvVariable("CACHEBUSTER", time.Now().String()).
+		WithExec([]string{"tofu", "init"})
 
-	
-	args := []string{"terraform", "destroy"}
-	if autoApprove {
-		args = append(args, "-auto-approve")
-	}
+	args := []string{"tofu", "destroy", "-auto-approve"}
 	if len(destroyArgs) > 0 {
 		args = append(args, destroyArgs...)
 	}
 
-	
 	container = container.WithExec(args)
 
-	
 	return container.Stdout(ctx)
 }

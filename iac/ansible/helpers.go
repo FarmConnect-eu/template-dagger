@@ -77,6 +77,14 @@ func (m *Ansible) buildContainer(
 			WithEnvVariable("ANSIBLE_ROLES_PATH", "/work/roles")
 	}
 
+	if m.Templates != nil {
+		container = container.WithDirectory("/work/templates", m.Templates)
+	}
+
+	if m.GroupVars != nil {
+		container = container.WithDirectory("/work/group_vars", m.GroupVars)
+	}
+
 	container = container.
 		WithExec([]string{"/usr/bin/apt-get", "clean"}).
 		WithExec([]string{"rm", "-rf", "/var/lib/apt/lists/*", "/tmp/*"})

@@ -1,4 +1,7 @@
 // Docker module for building and pushing container images
+//
+// This module provides Docker image build and push operations using Dagger's
+// native container build capabilities. Supports Azure ACR and other registries.
 package main
 
 import (

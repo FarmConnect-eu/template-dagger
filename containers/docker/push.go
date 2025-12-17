@@ -8,6 +8,10 @@ import (
 )
 
 // Push pushes a built container to a registry
+//
+// Requires registry authentication configured via WithRegistry().
+// Pushes all configured tags (defaults to "latest" if none specified).
+// Returns the image digest.
 func (m *Docker) Push(
 	ctx context.Context,
 	// Built container from Build()
@@ -25,12 +29,14 @@ func (m *Docker) Push(
 		return "", fmt.Errorf("invalid image name: %w", err)
 	}
 
+	// Authenticate to registry
 	container = container.WithRegistryAuth(
 		m.RegistryHost,
 		m.RegistryUsername,
 		m.RegistryPassword,
 	)
 
+	// Push all configured tags
 	tags := m.getDefaultTags()
 	var lastDigest string
 

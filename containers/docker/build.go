@@ -7,6 +7,8 @@ import (
 )
 
 // Build builds a Docker image from a Dockerfile using Dagger's native build
+//
+// Returns a container that can be exported or pushed to a registry.
 func (m *Docker) Build(
 	// Directory containing Dockerfile and build context
 	source *dagger.Directory,
@@ -25,15 +27,18 @@ func (m *Docker) Build(
 		dockerfile = "Dockerfile"
 	}
 
+	// Build options
 	buildOpts := dagger.DirectoryDockerBuildOpts{
 		Dockerfile: dockerfile,
 		Platform:   m.Platform,
 	}
 
+	// Set target if configured
 	if m.Target != "" {
 		buildOpts.Target = m.Target
 	}
 
+	// Add build arguments (convert to Dagger BuildArg type)
 	if len(m.BuildArgs) > 0 {
 		buildArgs := make([]dagger.BuildArg, 0, len(m.BuildArgs))
 		for _, arg := range m.BuildArgs {
@@ -45,8 +50,10 @@ func (m *Docker) Build(
 		buildOpts.BuildArgs = buildArgs
 	}
 
+	// Build container using Directory.DockerBuild()
 	container := source.DockerBuild(buildOpts)
 
+	// Add image reference as label
 	tags := m.getDefaultTags()
 	for _, tag := range tags {
 		fullRef := buildFullReference(m.RegistryHost, imageName, tag)

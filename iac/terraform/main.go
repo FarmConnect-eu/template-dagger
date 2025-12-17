@@ -15,10 +15,11 @@ type Variable struct {
 }
 
 type StateConfig struct {
-	Backend string
-	Bucket  string
-	Key     string
-	Region  string
+	Backend  string
+	Bucket   string
+	Key      string
+	Region   string
+	Endpoint string
 }
 
 type Terraform struct {
@@ -31,7 +32,7 @@ func New() *Terraform {
 	return &Terraform{
 		Variables:        []Variable{},
 		State:            nil,
-		TerraformVersion: "1.9.8",
+		TerraformVersion: "1.10.6",
 	}
 }
 

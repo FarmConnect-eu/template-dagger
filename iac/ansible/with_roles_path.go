@@ -14,6 +14,8 @@ func (m *Ansible) WithRolesPath(
 		Inventory:      m.Inventory,
 		Requirements:   m.Requirements,
 		RolesPath:      path,
+		Templates:      m.Templates,
+		GroupVars:      m.GroupVars,
 		ExtraVars:      make([]KeyValue, len(m.ExtraVars)),
 		Tags:           make([]string, len(m.Tags)),
 		SkipTags:       make([]string, len(m.SkipTags)),

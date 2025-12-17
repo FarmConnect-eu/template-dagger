@@ -1,10 +1,13 @@
 package main
 
 // WithTarget sets the build target for multi-stage Dockerfiles
+//
+// Specifies which stage to build when using multi-stage builds.
 func (m *Docker) WithTarget(
 	// Stage name from Dockerfile (e.g., "builder", "production")
 	target string,
 ) *Docker {
+	// Deep copy slices
 	newBuildArgs := make([]DockerBuildArg, len(m.BuildArgs))
 	copy(newBuildArgs, m.BuildArgs)
 

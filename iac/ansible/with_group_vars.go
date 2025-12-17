@@ -2,9 +2,11 @@ package main
 
 import "dagger/ansible/internal/dagger"
 
-// WithInventory sets the inventory file.
-func (m *Ansible) WithInventory(
-	inventory *dagger.File,
+// WithGroupVars sets the group_vars directory to be mounted in the container.
+// Group vars will be available at /work/group_vars for Ansible to use.
+func (m *Ansible) WithGroupVars(
+	// Directory containing Ansible group_vars
+	groupVars *dagger.Directory,
 ) *Ansible {
 	newVariables := make([]Variable, len(m.Variables))
 	copy(newVariables, m.Variables)
@@ -14,17 +16,18 @@ func (m *Ansible) WithInventory(
 
 	newTags := make([]string, len(m.Tags))
 	copy(newTags, m.Tags)
+
 	newSkipTags := make([]string, len(m.SkipTags))
 	copy(newSkipTags, m.SkipTags)
 
 	return &Ansible{
 		Variables:      newVariables,
 		AnsibleVersion: m.AnsibleVersion,
-		Inventory:      inventory,
+		Inventory:      m.Inventory,
 		Requirements:   m.Requirements,
 		RolesPath:      m.RolesPath,
 		Templates:      m.Templates,
-		GroupVars:      m.GroupVars,
+		GroupVars:      groupVars,
 		ExtraVars:      newExtraVars,
 		Tags:           newTags,
 		SkipTags:       newSkipTags,

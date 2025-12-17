@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"dagger/terraform/internal/dagger"
 )
@@ -43,10 +44,11 @@ func (m *Terraform) Plan(
 	}
 
 	
-	container = container.WithExec([]string{"terraform", "init"})
+	container = container.
+		WithEnvVariable("CACHEBUSTER", time.Now().String()).
+		WithExec([]string{"tofu", "init"})
 
-	
-	args := []string{"terraform", "plan"}
+	args := []string{"tofu", "plan"}
 	if detailedExitcode {
 		args = append(args, "-detailed-exitcode")
 	}

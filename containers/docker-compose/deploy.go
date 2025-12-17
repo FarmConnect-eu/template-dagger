@@ -6,7 +6,25 @@ import (
 	"fmt"
 )
 
-// Deploy deploys the Docker Compose stack (pull, recreate, status)
+// Deploy deploys the Docker Compose stack
+//
+// This function performs:
+// 1. Pull latest images
+// 2. Stop and remove existing containers
+// 3. Start new containers with --force-recreate
+// 4. Display container status
+//
+// Parameters:
+//   - source: Directory containing the docker-compose.yml file
+//   - composePath: Path to docker-compose.yml relative to source (default: "docker-compose.yml")
+//   - projectName: Docker Compose project name (optional, uses directory name if not set)
+//
+// Example:
+//
+//	dagger call deploy \
+//	  --source . \
+//	  --compose-path docker/docker-compose.yml \
+//	  --project-name chat
 func (m *DockerCompose) Deploy(
 	ctx context.Context,
 	source *dagger.Directory,
@@ -23,16 +41,20 @@ func (m *DockerCompose) Deploy(
 	container := m.buildContainer(ctx, source, composePath)
 	composeCmd := getComposeCommand(composePath)
 
+	// Add project name if specified
 	if projectName != "" {
 		composeCmd = append(composeCmd, "-p", projectName)
 	}
 
+	// Pull latest images
 	pullCmd := append(composeCmd, "pull")
 	container = container.WithExec(pullCmd)
 
+	// Deploy with force recreate
 	upCmd := append(composeCmd, "up", "-d", "--force-recreate")
 	container = container.WithExec(upCmd)
 
+	// Get container status
 	psCmd := append(composeCmd, "ps")
 	output, err := container.WithExec(psCmd).Stdout(ctx)
 	if err != nil {

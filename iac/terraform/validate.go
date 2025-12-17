@@ -29,10 +29,9 @@ func (m *Terraform) Validate(
 	container := m.buildContainer(source, subpath)
 
 	
-	container = container.WithExec([]string{"terraform", "init", "-backend=false"})
+	container = container.WithExec([]string{"tofu", "init", "-backend=false"})
 
-	
-	container = container.WithExec([]string{"terraform", "validate"})
+	container = container.WithExec([]string{"tofu", "validate"})
 
 	
 	return container.Stdout(ctx)

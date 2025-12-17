@@ -13,12 +13,16 @@ func (m *Terraform) WithState(
 	// Region (used for S3)
 	// +optional
 	region string,
+	// S3-compatible endpoint URL (for MinIO, etc.)
+	// +optional
+	endpoint string,
 ) *Terraform {
 	stateConfig := &StateConfig{
-		Backend: backend,
-		Bucket:  bucket,
-		Key:     key,
-		Region:  region,
+		Backend:  backend,
+		Bucket:   bucket,
+		Key:      key,
+		Region:   region,
+		Endpoint: endpoint,
 	}
 
 	// Deep copy pour éviter les mutations (pattern immutable)

@@ -31,7 +31,7 @@ func (m *Terraform) Format(
 	container := m.buildContainer(source, subpath)
 
 	
-	args := []string{"terraform", "fmt"}
+	args := []string{"tofu", "fmt"}
 	if check {
 		args = append(args, "-check")
 	}

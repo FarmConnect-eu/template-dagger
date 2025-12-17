@@ -36,6 +36,8 @@ type Ansible struct {
 	Inventory      *dagger.File
 	Requirements   *dagger.File
 	RolesPath      *dagger.Directory
+	Templates      *dagger.Directory
+	GroupVars      *dagger.Directory
 	ExtraVars      []KeyValue
 	Tags           []string
 	SkipTags       []string
@@ -48,6 +50,8 @@ func New() *Ansible {
 		Inventory:      nil,
 		Requirements:   nil,
 		RolesPath:      nil,
+		Templates:      nil,
+		GroupVars:      nil,
 		ExtraVars:      []KeyValue{},
 		Tags:           []string{},
 		SkipTags:       []string{},
