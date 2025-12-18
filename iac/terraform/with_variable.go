@@ -1,6 +1,8 @@
 package main
 
-// WithVariable adds une variable (non-secrète) au module
+import "dagger/terraform/internal/dagger"
+
+// WithVariable adds a non-secret variable to the module
 func (m *Terraform) WithVariable(
 	key string,
 	value string,
@@ -18,9 +20,13 @@ func (m *Terraform) WithVariable(
 	newVariables := make([]Variable, len(m.Variables), len(m.Variables)+1)
 	copy(newVariables, m.Variables)
 
+	newFiles := make([]*dagger.File, len(m.TfVarsFiles))
+	copy(newFiles, m.TfVarsFiles)
+
 	return &Terraform{
 		Variables:        append(newVariables, newVar),
 		State:            m.State,
 		TerraformVersion: m.TerraformVersion,
+		TfVarsFiles:      newFiles,
 	}
 }

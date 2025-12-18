@@ -32,7 +32,7 @@ func (m *Terraform) Destroy(
 
 	container := m.buildContainer(source, subpath)
 
-	container, err = m.injectVariables(ctx, container)
+	container, err = m.injectVariables(ctx, container, subpath)
 	if err != nil {
 		return "", err
 	}

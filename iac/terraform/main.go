@@ -26,6 +26,7 @@ type Terraform struct {
 	Variables        []Variable
 	State            *StateConfig
 	TerraformVersion string
+	TfVarsFiles      []*dagger.File
 }
 
 func New() *Terraform {
@@ -33,6 +34,7 @@ func New() *Terraform {
 		Variables:        []Variable{},
 		State:            nil,
 		TerraformVersion: "1.10.6",
+		TfVarsFiles:      []*dagger.File{},
 	}
 }
 

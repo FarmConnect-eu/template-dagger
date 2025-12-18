@@ -20,9 +20,13 @@ func (m *Terraform) WithSecret(
 	newVariables := make([]Variable, len(m.Variables), len(m.Variables)+1)
 	copy(newVariables, m.Variables)
 
+	newFiles := make([]*dagger.File, len(m.TfVarsFiles))
+	copy(newFiles, m.TfVarsFiles)
+
 	return &Terraform{
 		Variables:        append(newVariables, newVar),
 		State:            m.State,
 		TerraformVersion: m.TerraformVersion,
+		TfVarsFiles:      newFiles,
 	}
 }

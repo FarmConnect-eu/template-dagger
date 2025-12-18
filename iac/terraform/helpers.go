@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"dagger/terraform/internal/dagger"
 )
@@ -28,9 +30,14 @@ func (m *Terraform) buildContainer(
 		WithWorkdir(fmt.Sprintf("/work/%s", subpath))
 }
 
+// injectVariables adds environment variables and mounts tfvars files.
+// Tfvars files are named *.auto.tfvars for automatic loading by Terraform.
 func (m *Terraform) injectVariables(
 	ctx context.Context,
 	container *dagger.Container,
+	// +optional
+	// +default="."
+	subpath string,
 ) (*dagger.Container, error) {
 	for _, v := range m.Variables {
 		varName := v.Key
@@ -43,6 +50,12 @@ func (m *Terraform) injectVariables(
 		} else {
 			container = container.WithEnvVariable(varName, v.Value)
 		}
+	}
+
+	// Mount tfvars files with .auto.tfvars extension for automatic loading
+	for i, file := range m.TfVarsFiles {
+		filename := fmt.Sprintf("dagger-%d.auto.tfvars", i)
+		container = container.WithFile(filename, file)
 	}
 
 	return container, nil

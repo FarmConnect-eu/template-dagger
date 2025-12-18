@@ -32,7 +32,7 @@ func (m *Terraform) Apply(
 
 	container := m.buildContainer(source, subpath)
 
-	container, err = m.injectVariables(ctx, container)
+	container, err = m.injectVariables(ctx, container, subpath)
 	if err != nil {
 		return "", err
 	}

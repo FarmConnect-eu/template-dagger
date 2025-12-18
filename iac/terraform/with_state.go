@@ -1,5 +1,7 @@
 package main
 
+import "dagger/terraform/internal/dagger"
+
 // WithState configures Terraform backend for state management (supports s3, gcs, azurerm, local).
 func (m *Terraform) WithState(
 	// Backend type (s3, gcs, azurerm, local)
@@ -25,13 +27,16 @@ func (m *Terraform) WithState(
 		Endpoint: endpoint,
 	}
 
-	// Deep copy pour éviter les mutations (pattern immutable)
 	newVariables := make([]Variable, len(m.Variables))
 	copy(newVariables, m.Variables)
+
+	newFiles := make([]*dagger.File, len(m.TfVarsFiles))
+	copy(newFiles, m.TfVarsFiles)
 
 	return &Terraform{
 		Variables:        newVariables,
 		State:            stateConfig,
 		TerraformVersion: m.TerraformVersion,
+		TfVarsFiles:      newFiles,
 	}
 }
