@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"dagger/terraform/internal/dagger"
 )
