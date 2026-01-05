@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"dagger/docker-compose/internal/dagger"
 	"fmt"
+
+	"dagger/docker-compose/internal/dagger"
 )
 
 // Deploy deploys the Docker Compose stack
@@ -51,8 +52,10 @@ func (m *DockerCompose) Deploy(
 	container = container.WithExec(pullCmd)
 
 	// Deploy with force recreate
-	upCmd := append(composeCmd, "up", "-d", "--force-recreate")
-	container = container.WithExec(upCmd)
+	upCmd := append(composeCmd, "up", "-d", "--pull", "always", "--force-recreate")
+	container = container.
+		WithEnvVariable("DAGGER_CACHE_BUSTER", time.Now().String()).
+		WithExec(upCmd)
 
 	// Get container status
 	psCmd := append(composeCmd, "ps")
