@@ -44,12 +44,15 @@ func (m *Ansible) RunPlaybook(
 		return "", fmt.Errorf("failed to inject variables: %w", err)
 	}
 
+	// Mount SSH key with generic name and set ANSIBLE_PRIVATE_KEY_FILE
+	// This works with any key type (RSA, ed25519, ecdsa)
 	container = container.
 		WithExec([]string{"mkdir", "-p", "/root/.ssh"}).
-		WithMountedSecret("/root/.ssh/id_rsa", sshPrivateKey, dagger.ContainerWithMountedSecretOpts{
+		WithMountedSecret("/root/.ssh/ansible_key", sshPrivateKey, dagger.ContainerWithMountedSecretOpts{
 			Mode:  0600,
 			Owner: "root:root",
-		})
+		}).
+		WithEnvVariable("ANSIBLE_PRIVATE_KEY_FILE", "/root/.ssh/ansible_key")
 
 	container = container.
 		WithExec([]string{"sh", "-c", "ssh-keyscan -H github.com >> /root/.ssh/known_hosts || true"})
