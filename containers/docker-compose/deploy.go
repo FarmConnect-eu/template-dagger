@@ -2,19 +2,19 @@ package main
 
 import (
 	"context"
+	"dagger/docker-compose/internal/dagger"
 	"fmt"
 	"time"
-
-	"dagger/docker-compose/internal/dagger"
 )
 
 // Deploy deploys the Docker Compose stack
 //
 // This function performs:
-// 1. Pull latest images
-// 2. Stop and remove existing containers
-// 3. Start new containers with --force-recreate
-// 4. Display container status
+// 1. Pull and start containers with --pull always --force-recreate
+// 2. Display container status
+//
+// The --pull always flag ensures images are always re-downloaded from registry,
+// bypassing local cache. This guarantees "latest" tags get the actual latest version.
 //
 // Parameters:
 //   - source: Directory containing the docker-compose.yml file
@@ -48,11 +48,13 @@ func (m *DockerCompose) Deploy(
 		composeCmd = append(composeCmd, "-p", projectName)
 	}
 
-	// Pull latest images
-	pullCmd := append(composeCmd, "pull")
-	container = container.WithExec(pullCmd)
-
-	// Deploy with force recreate
+	// Deploy with force pull and recreate
+	// --pull always: forces re-download of images (ignores local cache)
+	// --force-recreate: recreates containers even if config unchanged
+	//
+	// IMPORTANT: WithEnvVariable with timestamp prevents Dagger from caching
+	// the execution result. Without this, Dagger may return cached output
+	// without actually running the deployment commands on the remote host.
 	upCmd := append(composeCmd, "up", "-d", "--pull", "always", "--force-recreate")
 	container = container.
 		WithEnvVariable("DAGGER_CACHE_BUSTER", time.Now().String()).
