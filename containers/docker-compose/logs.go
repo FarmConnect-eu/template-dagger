@@ -23,6 +23,8 @@ import (
 //	  --compose-path docker/docker-compose.yml \
 //	  --tail 50 \
 //	  --project-name chat
+//
+// +cache="never"
 func (m *DockerCompose) Logs(
 	ctx context.Context,
 	source *dagger.Directory,

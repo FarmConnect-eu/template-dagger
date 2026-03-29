@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"dagger/docker-compose/internal/dagger"
 )
@@ -81,6 +82,9 @@ func (m *DockerCompose) buildContainer(
 			container = container.WithEnvVariable(v.Key, v.Value)
 		}
 	}
+
+	// Bust Dagger's execution cache to ensure remote commands always run
+	container = container.WithEnvVariable("DAGGER_CACHE_BUSTER", time.Now().String())
 
 	return container
 }

@@ -38,6 +38,13 @@ func (m *Docker) getDefaultTags() []string {
 
 // parseSemanticVersion parses a semantic version and returns all applicable tags.
 // For non-semver tags, returns just the original tag.
+//
+// Tagging strategy:
+//   - v1.0.0-dev   -> v1.0.0-dev, v1.0.0-dev, v1.0-dev, v1-dev, dev
+//   - v1.0.0-dev.1 -> v1.0.0-dev.1, v1.0.0-dev, v1.0-dev, v1-dev, dev
+//   - v1.0.0-rc1   -> v1.0.0-rc1, v1.0.0-rc, v1.0-rc, v1-rc, rc
+//   - v1.0.0-release -> v1.0.0-release, v1.0.0, v1.0, v1, release, latest
+//   - v1.0.0       -> v1.0.0, v1.0, v1, latest
 func parseSemanticVersion(version string) []string {
 	var tags []string
 
@@ -64,29 +71,28 @@ func parseSemanticVersion(version string) []string {
 		prefix = "v"
 	}
 
-	// Add version hierarchy tags (without prerelease suffix)
+	// Build version components
 	patchTag := prefix + major + "." + minor + "." + patch
 	minorTag := prefix + major + "." + minor
 	majorTag := prefix + major
-
-	// Only add patch tag if different from the exact version
-	if patchTag != version {
-		tags = append(tags, patchTag)
-	}
-	tags = append(tags, minorTag, majorTag)
 
 	// Handle prerelease suffixes
 	if prerelease != "" {
 		prereleaseLower := strings.ToLower(prerelease)
 
-		if strings.HasPrefix(prereleaseLower, "rc") {
-			tags = append(tags, "rc")
+		if strings.HasPrefix(prereleaseLower, "dev") {
+			// Dev tags: v1.0.0-dev, v1.0-dev, v1-dev, dev
+			tags = append(tags, patchTag+"-dev", minorTag+"-dev", majorTag+"-dev", "dev")
+		} else if strings.HasPrefix(prereleaseLower, "rc") {
+			// RC tags: v1.0.0-rc, v1.0-rc, v1-rc, rc
+			tags = append(tags, patchTag+"-rc", minorTag+"-rc", majorTag+"-rc", "rc")
 		} else if prereleaseLower == "release" {
-			tags = append(tags, "release", "latest")
+			// Release tags: v1.0.0, v1.0, v1, release, latest
+			tags = append(tags, patchTag, minorTag, majorTag, "release", "latest")
 		}
 	} else {
-		// No prerelease suffix = stable release, add "latest"
-		tags = append(tags, "latest")
+		// No prerelease suffix = stable release: v1.0, v1, latest
+		tags = append(tags, minorTag, majorTag, "latest")
 	}
 
 	return tags

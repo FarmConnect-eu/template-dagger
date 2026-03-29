@@ -27,6 +27,8 @@ import (
 //	  --source . \
 //	  --compose-path docker/docker-compose.yml \
 //	  --project-name chat
+//
+// +cache="never"
 func (m *DockerCompose) Deploy(
 	ctx context.Context,
 	source *dagger.Directory,

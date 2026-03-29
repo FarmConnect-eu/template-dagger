@@ -15,6 +15,7 @@ import (
 func (m *Docker) BuildAndPush(
 	ctx context.Context,
 	// Directory containing Dockerfile and build context
+	// +ignore=[".git", "**/.gitignore"]
 	source *dagger.Directory,
 	// Image name without registry prefix (e.g., "myapp")
 	imageName string,

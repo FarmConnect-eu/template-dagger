@@ -11,6 +11,7 @@ import (
 // Returns a container that can be exported or pushed to a registry.
 func (m *Docker) Build(
 	// Directory containing Dockerfile and build context
+	// +ignore=[".git", "**/.gitignore"]
 	source *dagger.Directory,
 	// Image name for reference (e.g., "myapp")
 	imageName string,
