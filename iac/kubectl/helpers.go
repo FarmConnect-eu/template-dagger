@@ -24,7 +24,10 @@ func (m *Kubectl) buildContainer(
 	// Mount kubeconfig as secret
 	if m.Kubeconfig != nil {
 		container = container.
-			WithMountedSecret("/tmp/kubeconfig", m.Kubeconfig).
+			WithMountedSecret("/tmp/kubeconfig", m.Kubeconfig, dagger.ContainerWithMountedSecretOpts{
+				Owner: "1001",
+				Mode:  0400,
+			}).
 			WithEnvVariable("KUBECONFIG", "/tmp/kubeconfig")
 	}
 
