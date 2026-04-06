@@ -15,7 +15,7 @@ func (m *Kubectl) buildContainer(
 ) *dagger.Container {
 	version := m.KubectlVersion
 	if version == "" {
-		version = "1.31"
+		version = "latest"
 	}
 
 	if subpath == "" {
