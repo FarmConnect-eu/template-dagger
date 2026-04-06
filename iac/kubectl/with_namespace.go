@@ -6,8 +6,7 @@ func (m *Kubectl) WithNamespace(
 	namespace string,
 ) *Kubectl {
 	return &Kubectl{
-		Kubeconfig:     m.Kubeconfig,
-		Namespace:      namespace,
-		KubectlVersion: m.KubectlVersion,
+		Kubeconfig: m.Kubeconfig,
+		Namespace:  namespace,
 	}
 }

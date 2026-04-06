@@ -1,9 +1,8 @@
 package main
 
 import (
-	"fmt"
-
 	"dagger/kubectl/internal/dagger"
+	"fmt"
 )
 
 // buildContainer creates the base kubectl container with kubeconfig mounted
@@ -13,17 +12,12 @@ func (m *Kubectl) buildContainer(
 	// +default="."
 	subpath string,
 ) *dagger.Container {
-	version := m.KubectlVersion
-	if version == "" {
-		version = "latest"
-	}
-
 	if subpath == "" {
 		subpath = "."
 	}
 
 	container := dag.Container().
-		From(fmt.Sprintf("bitnami/kubectl:%s", version)).
+		From("bitnami/kubectl:latest").
 		WithDirectory("/work", source).
 		WithWorkdir(fmt.Sprintf("/work/%s", subpath))
 

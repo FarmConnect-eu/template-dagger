@@ -14,17 +14,13 @@ type Kubectl struct {
 
 	// Target namespace (default: "default")
 	Namespace string
-
-	// kubectl version to use (default: "1.31")
-	KubectlVersion string
 }
 
 // New creates a new Kubectl instance with defaults
 func New() *Kubectl {
 	return &Kubectl{
-		Kubeconfig:     nil,
-		Namespace:      "default",
-		KubectlVersion: "1.31",
+		Kubeconfig: nil,
+		Namespace:  "default",
 	}
 }
 

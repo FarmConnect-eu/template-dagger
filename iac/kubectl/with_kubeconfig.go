@@ -10,8 +10,7 @@ func (m *Kubectl) WithKubeconfig(
 	kubeconfig *dagger.Secret,
 ) *Kubectl {
 	return &Kubectl{
-		Kubeconfig:     kubeconfig,
-		Namespace:      m.Namespace,
-		KubectlVersion: m.KubectlVersion,
+		Kubeconfig: kubeconfig,
+		Namespace:  m.Namespace,
 	}
 }
