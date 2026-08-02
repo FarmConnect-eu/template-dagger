@@ -10,26 +10,7 @@ func (m *Docker) WithArg(
 	// Argument value
 	value string,
 ) *Docker {
-	newArg := DockerBuildArg{
-		Key:   key,
-		Value: value,
-	}
-
-	// Deep copy slice (immutable pattern)
-	newBuildArgs := make([]DockerBuildArg, len(m.BuildArgs), len(m.BuildArgs)+1)
-	copy(newBuildArgs, m.BuildArgs)
-
-	// Deep copy tags slice
-	newTags := make([]string, len(m.Tags))
-	copy(newTags, m.Tags)
-
-	return &Docker{
-		BuildArgs:        append(newBuildArgs, newArg),
-		Tags:             newTags,
-		Target:           m.Target,
-		Platform:         m.Platform,
-		RegistryHost:     m.RegistryHost,
-		RegistryUsername: m.RegistryUsername,
-		RegistryPassword: m.RegistryPassword,
-	}
+	c := m.clone()
+	c.BuildArgs = append(c.BuildArgs, DockerBuildArg{Key: key, Value: value})
+	return c
 }

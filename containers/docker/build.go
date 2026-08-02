@@ -61,5 +61,10 @@ func (m *Docker) Build(
 		container = container.WithLabel("org.opencontainers.image.ref.name", fullRef)
 	}
 
+	// Apply configured OCI labels (visible via docker inspect, preserved on push).
+	for _, label := range m.Labels {
+		container = container.WithLabel(label.Key, label.Value)
+	}
+
 	return container, nil
 }

@@ -3,9 +3,34 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"dagger/terraform/internal/dagger"
 )
+
+// preparePlanContainer configures the backend, builds the container, injects
+// variables and runs `tofu init`. Shared by Plan and PlanArtifact.
+func (m *Terraform) preparePlanContainer(
+	ctx context.Context,
+	source *dagger.Directory,
+	subpath string,
+) (*dagger.Container, error) {
+	source, err := m.configureBackend(ctx, source, subpath)
+	if err != nil {
+		return nil, err
+	}
+
+	container := m.buildContainer(source, subpath)
+
+	container, err = m.injectVariables(ctx, container)
+	if err != nil {
+		return nil, err
+	}
+
+	return container.
+		WithEnvVariable("CACHEBUSTER", time.Now().String()).
+		WithExec([]string{"tofu", "init"}), nil
+}
 
 func (m *Terraform) buildContainer(
 	source *dagger.Directory,
@@ -33,9 +58,6 @@ func (m *Terraform) buildContainer(
 func (m *Terraform) injectVariables(
 	ctx context.Context,
 	container *dagger.Container,
-	// +optional
-	// +default="."
-	subpath string,
 ) (*dagger.Container, error) {
 	for _, v := range m.Variables {
 		varName := v.Key

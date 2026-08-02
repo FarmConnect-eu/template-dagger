@@ -38,7 +38,7 @@ func (m *Terraform) Output(
 	container := m.buildContainer(source, subpath)
 
 	
-	container, err = m.injectVariables(ctx, container, subpath)
+	container, err = m.injectVariables(ctx, container)
 	if err != nil {
 		return "", err
 	}
@@ -85,7 +85,7 @@ func (m *Terraform) SensitiveOutput(
 
 	container := m.buildContainer(source, subpath)
 
-	container, err = m.injectVariables(ctx, container, subpath)
+	container, err = m.injectVariables(ctx, container)
 	if err != nil {
 		return "", err
 	}

@@ -5,13 +5,16 @@ Module Dagger réutilisable pour exécuter Terraform dans un conteneur de maniè
 ## 🎯 Fonctionnalités
 
 - **Plan**: Génère un plan d'exécution Terraform
-- **Apply**: Applique les changements d'infrastructure
+- **PlanArtifact**: Produit un plan sauvegardé (`tfplan.bin` + `tfplan.json` + `plan.txt` + `changes`)
+- **InitArtifact**: Initialise les modules distants pour un scan Trivy exhaustif
+- **Apply**: Applique les changements d'infrastructure, ou rejoue un plan sauvegardé
 - **Destroy**: Détruit l'infrastructure gérée
 - **Validate**: Valide la configuration Terraform
 - **Format**: Formate les fichiers Terraform
 - **Output**: Récupère les outputs Terraform au format JSON
 - **Gestion d'état**: Support backends S3, GCS, Azure, local
 - **Variables sécurisées**: Support natif Dagger pour env:, file:, etc.
+- **Fichiers tfvars**: Montage automatique via `WithTfVarsFile`
 
 ## 🏗️ Architecture
 
@@ -21,13 +24,16 @@ Ce module utilise une **architecture modulaire** avec un pattern immutable :
 terraform/
 ├── main.go                    # Structs et types (60 lignes)
 ├── helpers.go                 # Fonctions utilitaires partagées
-├── plan.go                    # Opération Plan
+├── plan.go                    # Opérations Plan et PlanArtifact
+├── init_artifact.go           # Opération InitArtifact
 ├── deploy.go                  # Opération Apply
 ├── destroy.go                 # Opération Destroy
 ├── validate.go                # Opération Validate
 ├── format.go                  # Opération Format
 ├── outputs.go                 # Opération Output
 ├── with_variable.go           # Gestion des variables
+├── with_secret.go             # Gestion des variables secrètes
+├── with_tfvars.go             # Montage de fichiers .tfvars
 ├── with_state.go              # Configuration du backend
 ├── with_terraform_version.go  # Version de Terraform
 └── README.md
@@ -161,13 +167,26 @@ dagger call \
 
 #### WithTerraformVersion
 
-Configure la version de Terraform à utiliser (défaut: `1.9.8`).
+Configure la version de Terraform à utiliser (défaut: `1.10.6`).
 
 **Exemple** :
 ```bash
 dagger call \
   with-terraform-version --version 1.10.0 \
   plan --source .
+```
+
+#### WithTfVarsFile
+
+Monte un fichier `.tfvars`. Les fichiers sont montés sous le nom
+`dagger-<n>.auto.tfvars` pour être chargés automatiquement par OpenTofu.
+Chaîner l'appel plusieurs fois pour monter plusieurs fichiers.
+
+**Exemple** :
+```bash
+dagger call \
+  with-tf-vars-file --file ./terraform.tfvars \
+  plan --source ./terraform
 ```
 
 
@@ -180,6 +199,7 @@ Génère et affiche un plan d'exécution Terraform.
 **Paramètres** :
 - `source` : Répertoire contenant le code Terraform
 - `detailed-exitcode` : Utiliser `-detailed-exitcode` (défaut: `false`)
+- `destroy` : Générer un plan de destruction (`tofu plan -destroy`, défaut: `false`)
 - `plan-args` : Arguments supplémentaires pour `terraform plan`
 
 **Exemple complet** :
@@ -195,13 +215,73 @@ dagger call \
   plan --source ./terraform --detailed-exitcode
 ```
 
+#### PlanArtifact
+
+Génère un plan **sauvegardé et réutilisable**, et retourne un répertoire contenant :
+
+| Fichier | Contenu |
+|---------|---------|
+| `tfplan.bin` | Plan binaire, consommable tel quel par `apply --plan-file` |
+| `tfplan.json` | `tofu show -json` du plan — entrée du scan `security/trivy scan-plan` |
+| `plan.txt` | `tofu show` lisible pour les reviewers (valeurs sensibles masquées) |
+| `changes` | `"true"` si des changements sont en attente, sinon `"false"` |
+
+L'appel n'échoue pas quand des changements existent (code de sortie 2 intercepté) :
+la barrière CI se décide en lisant `changes`.
+
+**Paramètres** :
+- `source` : Répertoire contenant le code Terraform
+- `subpath` : Sous-chemin relatif dans `source` (défaut: `.`)
+- `destroy` : Générer un plan de destruction (défaut: `false`)
+- `plan-args` : Arguments supplémentaires pour `tofu plan`
+
+**Exemple — plan → scan → apply du plan exact** :
+```bash
+# 1. Produire l'artefact de plan
+dagger call \
+  with-secret --key proxmox_api_token_secret --value env:PM_TOKEN_SECRET --tf-var \
+  with-state --backend s3 --bucket terraform --key infra-nfs/state.tfstate --region main \
+  plan-artifact --source . --subpath terraform \
+  export --path /tmp/plan
+
+# 2. Scanner les misconfigurations du plan
+dagger call -m ../../security/trivy \
+  scan-plan --plan /tmp/plan/tfplan.json --fail-on-findings
+
+# 3. Appliquer exactement ce plan (pas de recalcul)
+dagger call \
+  with-secret --key proxmox_api_token_secret --value env:PM_TOKEN_SECRET --tf-var \
+  with-state --backend s3 --bucket terraform --key infra-nfs/state.tfstate --region main \
+  apply --source . --subpath terraform --plan-file /tmp/plan/tfplan.bin
+```
+
+#### InitArtifact
+
+Exécute `tofu init -backend=false` et retourne le répertoire de travail initialisé,
+`.terraform/modules` inclus. Destiné à être scanné par `security/trivy scan-config` :
+Trivy voit alors le contenu réel des modules distants, et pas seulement le code wrapper.
+`.terraform/providers` est retiré de l'artefact (inutile à `trivy config`, et volumineux).
+
+**Exemple** :
+```bash
+dagger call init-artifact --source . --subpath terraform export --path /tmp/tf-init
+dagger call -m ../../security/trivy scan-config --source /tmp/tf-init --fail-on-findings
+```
+
 #### Apply
 
 Applique les changements Terraform à l'infrastructure.
 
+Sans `--plan-file`, le plan est recalculé au moment de l'apply. Avec `--plan-file`,
+le plan produit par `PlanArtifact` est appliqué **tel quel** : si l'état a changé depuis
+sa génération, OpenTofu refuse le plan obsolète (« saved plan is stale »).
+
+> Les credentials providers restent nécessaires même avec un plan sauvegardé : ils ne
+> sont pas stockés dans le plan. Continuer à chaîner `with-secret` / `with-variable`.
+
 **Paramètres** :
 - `source` : Répertoire contenant le code Terraform
-- `auto-approve` : Appliquer sans confirmation (défaut: `false`)
+- `plan-file` : Plan sauvegardé (`tfplan.bin`) à appliquer tel quel (optionnel)
 - `apply-args` : Arguments supplémentaires pour `terraform apply`
 
 **Exemple** :

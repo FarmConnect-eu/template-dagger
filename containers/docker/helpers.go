@@ -28,6 +28,30 @@ func buildFullReference(registryHost, imageName, tag string) string {
 	return fmt.Sprintf("%s/%s:%s", registryHost, imageName, tag)
 }
 
+// clone returns a new Docker with all slice fields deep-copied (immutable pattern).
+// Used by every With* method so adding a config slice stays correct by construction.
+func (m *Docker) clone() *Docker {
+	newBuildArgs := make([]DockerBuildArg, len(m.BuildArgs))
+	copy(newBuildArgs, m.BuildArgs)
+
+	newTags := make([]string, len(m.Tags))
+	copy(newTags, m.Tags)
+
+	newLabels := make([]DockerBuildArg, len(m.Labels))
+	copy(newLabels, m.Labels)
+
+	return &Docker{
+		RegistryHost:     m.RegistryHost,
+		RegistryUsername: m.RegistryUsername,
+		RegistryPassword: m.RegistryPassword,
+		BuildArgs:        newBuildArgs,
+		Tags:             newTags,
+		Labels:           newLabels,
+		Target:           m.Target,
+		Platform:         m.Platform,
+	}
+}
+
 // getDefaultTags returns configured tags or "latest" if none
 func (m *Docker) getDefaultTags() []string {
 	if len(m.Tags) == 0 {

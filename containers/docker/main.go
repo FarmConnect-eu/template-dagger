@@ -18,6 +18,7 @@ type Docker struct {
 	// Build configuration
 	BuildArgs []DockerBuildArg
 	Tags      []string
+	Labels    []DockerBuildArg
 	Target    string
 	Platform  dagger.Platform
 }
@@ -33,6 +34,7 @@ func New() *Docker {
 	return &Docker{
 		BuildArgs: []DockerBuildArg{},
 		Tags:      []string{},
+		Labels:    []DockerBuildArg{},
 		Platform:  "linux/amd64",
 	}
 }

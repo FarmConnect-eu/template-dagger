@@ -16,20 +16,9 @@ func (m *Docker) WithRegistry(
 	// Registry password or token (use env:VAR_NAME for environment variables)
 	password *dagger.Secret,
 ) *Docker {
-	// Deep copy slices
-	newBuildArgs := make([]DockerBuildArg, len(m.BuildArgs))
-	copy(newBuildArgs, m.BuildArgs)
-
-	newTags := make([]string, len(m.Tags))
-	copy(newTags, m.Tags)
-
-	return &Docker{
-		RegistryHost:     host,
-		RegistryUsername: username,
-		RegistryPassword: password,
-		BuildArgs:        newBuildArgs,
-		Tags:             newTags,
-		Target:           m.Target,
-		Platform:         m.Platform,
-	}
+	c := m.clone()
+	c.RegistryHost = host
+	c.RegistryUsername = username
+	c.RegistryPassword = password
+	return c
 }

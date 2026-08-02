@@ -1,0 +1,7 @@
+{
+  "name": "droast",
+  "engineVersion": "v0.20.0",
+  "sdk": {
+    "source": "go"
+  }
+}
