@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 
 	"dagger/trivy/internal/dagger"
@@ -23,19 +26,56 @@ func (m *Trivy) buildContainer() *dagger.Container {
 }
 
 // imageContainer prépare un conteneur Trivy avec, le cas échéant, les
-// identifiants registry pour scanner une image privée (Trivy lit
-// TRIVY_USERNAME / TRIVY_PASSWORD ; TRIVY_AUTH_URL restreint au registry visé).
-func (m *Trivy) imageContainer() *dagger.Container {
+// identifiants registry pour scanner une image privée.
+//
+// On NE passe PAS par TRIVY_USERNAME / TRIVY_PASSWORD : Trivy interprète ces
+// deux variables comme des LISTES séparées par des virgules et impose un
+// appariement exact. Un identifiant contenant une virgule — cas courant des
+// tokens de comptes robot Harbor — produit alors :
+//
+//	FATAL flag error: unable to convert flags to options:
+//	the number of usernames and passwords must match
+//
+// et aucun échappement n'est prévu côté Trivy. On monte donc un
+// `config.json` docker, que Trivy lit via DOCKER_CONFIG : le contenu est
+// opaque pour lui, la virgule ne pose plus aucun problème.
+//
+// Le fichier est monté via WithMountedSecret et non écrit par un WithExec :
+// un `printf > config.json` inscrirait le token dans une couche de conteneur,
+// donc dans le cache Dagger. Ici il ne persiste nulle part.
+func (m *Trivy) imageContainer(ctx context.Context) (*dagger.Container, error) {
 	container := m.buildContainer()
-	if m.RegistryUsername != "" && m.RegistryPassword != nil {
-		container = container.
-			WithEnvVariable("TRIVY_USERNAME", m.RegistryUsername).
-			WithSecretVariable("TRIVY_PASSWORD", m.RegistryPassword)
-		if m.RegistryHost != "" {
-			container = container.WithEnvVariable("TRIVY_AUTH_URL", m.RegistryHost)
-		}
+
+	if m.RegistryUsername == "" || m.RegistryPassword == nil {
+		return container, nil
 	}
-	return container
+	if m.RegistryHost == "" {
+		return nil, fmt.Errorf("registry host missing: use WithRegistry() with a host when credentials are set")
+	}
+
+	password, err := m.RegistryPassword.Plaintext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read registry password: %w", err)
+	}
+
+	auth := base64.StdEncoding.EncodeToString([]byte(m.RegistryUsername + ":" + password))
+	config, err := json.Marshal(map[string]any{
+		"auths": map[string]any{
+			m.RegistryHost: map[string]string{"auth": auth},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("build docker config: %w", err)
+	}
+
+	// Nom de secret déterministe et dérivé des identifiants : deux registries
+	// distincts dans une même session ne se marchent pas dessus.
+	name := fmt.Sprintf("trivy-docker-config-%x",
+		sha256.Sum256([]byte(m.RegistryHost+"\x00"+m.RegistryUsername)))
+
+	return container.
+		WithMountedSecret("/root/.docker/config.json", dag.SetSecret(name, string(config))).
+		WithEnvVariable("DOCKER_CONFIG", "/root/.docker"), nil
 }
 
 // reportExtension mappe un format Trivy vers une extension de fichier de rapport.

@@ -10,7 +10,7 @@ import (
 // ScanImage scanne les vulnérabilités d'une image Docker (`trivy image`).
 //
 // Pour une image d'un registry privé, configurer les identifiants au préalable via WithRegistry() :
-// Trivy pull l'image lui-même et lit TRIVY_USERNAME / TRIVY_PASSWORD pour s'authentifier.
+// Trivy pull l'image lui-même, en s'authentifiant via un config.json docker monté (cf. imageContainer).
 func (m *Trivy) ScanImage(
 	ctx context.Context,
 	// Référence complète de l'image (ex: "dordogne.azurecr.io/ad-frontend:v5")
@@ -28,7 +28,10 @@ func (m *Trivy) ScanImage(
 	// +default="table"
 	format string,
 ) (string, error) {
-	container := m.imageContainer()
+	container, err := m.imageContainer(ctx)
+	if err != nil {
+		return "", err
+	}
 
 	args := []string{
 		"trivy", "image",
@@ -86,7 +89,11 @@ func (m *Trivy) ScanImageArtifact(
 	args = append(args, "--format", "json", "--output", "/tmp/result.json", "--exit-code", "1", image)
 
 	// Image potentiellement mutable (tag) → empêcher la mise en cache du résultat.
-	base := m.imageContainer().WithEnvVariable("CACHEBUSTER", time.Now().String())
+	container, err := m.imageContainer(ctx)
+	if err != nil {
+		return nil, err
+	}
+	base := container.WithEnvVariable("CACHEBUSTER", time.Now().String())
 
 	return scanArtifact(ctx, base, args, format)
 }
