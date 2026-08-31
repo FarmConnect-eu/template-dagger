@@ -6,8 +6,10 @@ import (
 
 // WithRegistry configure l'authentification registry pour le scan d'images privées.
 //
-// Trivy s'authentifie via les variables TRIVY_USERNAME / TRIVY_PASSWORD lorsqu'il pull
-// l'image à scanner. Utiliser env:VAR_NAME pour les identifiants.
+// Les identifiants sont transmis à Trivy via un `config.json` docker monté en secret
+// (cf. imageContainer), et NON via TRIVY_USERNAME / TRIVY_PASSWORD : Trivy lit ces
+// variables comme des listes séparées par des virgules, ce qui casse dès qu'un token
+// en contient une. Utiliser env:VAR_NAME pour le mot de passe.
 func (m *Trivy) WithRegistry(
 	// Hôte du registry (ex: "dordogne.azurecr.io")
 	host string,
